@@ -75,8 +75,19 @@ lookup-by-title without a breaking change.
 
 ## Comment 6 — Rebase
 **What conflicted:**
+I rebased `feature/watchlist` onto the updated `main`. The only conflict was in
+`.gitignore` — both branches had added one. The UUID migration from main merged
+cleanly with no conflict.
+
 **How I resolved it:**
+The two `.gitignore` versions only differed by one extra line (`.pytest_cache/`),
+so I kept all the lines from both, removed the conflict markers, then ran
+`git add .gitignore` and `git rebase --continue`.
+
 **How I verified no conflict remains:**
+`git status` showed a clean working tree with no unmerged files, and there are no
+`<<<<<<<`/`>>>>>>>` markers left in the repo. `git log` shows my commits stacked
+on top of main with a linear history (no merge commits).
 
 ## PR Description
 <!-- Written at the end — feature overview, design decisions, manual testing steps -->
