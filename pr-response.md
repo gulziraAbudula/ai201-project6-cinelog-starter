@@ -1,7 +1,13 @@
 # PR Response Doc — CineLog Watchlist Feature
 
 ## AI Usage
-<!-- Fill in at the end — how you used AI tools during this project -->
+I used Claude Code as a pair-programming assistant. Specifically, it helped me:
+- Recover a `git rebase` that got stuck, resolve the `.gitignore` conflict, and reword commits to follow Conventional Commits.
+- Sharpen my written answers for the review comments (visibility default, sort order, rebase notes).
+- Draft the PR description and manual testing steps.
+- Spot inconsistencies between my code and my design notes (e.g. sort order and error handling).
+
+I reviewed and made the final decisions on all changes myself.
 
 ## Comment 1 — Rename
 **What I did:**
@@ -90,7 +96,80 @@ so I kept all the lines from both, removed the conflict markers, then ran
 on top of main with a linear history (no merge commits).
 
 ## PR Description
-<!-- Written at the end — feature overview, design decisions, manual testing steps -->
+
+### What this feature does
+Adds a **watchlist** to CineLog — a per-user list of films a user intends to watch
+later. It's separate from the collection (films already watched and logged). It's
+backed by a new `WatchlistEntry` model (`user_id`, `film_id`, `date_added`,
+`public`) and exposes two endpoints under `/watchlist`:
+
+- `POST /watchlist/<user_id>/add` — add a film to the user's watchlist.
+  Body: `{ "film_id": "<uuid>" }`. Validates that the film exists and (by design)
+  rejects films already on the watchlist.
+- `GET /watchlist/<user_id>` — return the user's watchlist as a list of film
+  objects, each annotated with its `date_added` timestamp and `public` flag.
+
+### Design decisions
+1. **Default visibility — `public=True`.** New watchlist entries are public by
+   default because CineLog is a social app: defaulting to visible makes the
+   sharing/discovery features work without the user having to flip a setting.
+   Full reasoning and the privacy tradeoff are in **Comment 4** above.
+2. **Sort order — alphabetical by film title (`Film.title` ascending).**
+   `get_watchlist()` returns entries A→Z by title, optimizing for scanning and
+   finding a specific title in a growing list. The maintainer preferred
+   date-added; my engagement with that argument is in **Comment 5** above. Note
+   this intentionally differs from `get_collection()`, which sorts newest-first.
+
+### How to test it manually
+Films are seeded and there is no user-creation endpoint, so seed a user and a
+couple of films once, then exercise the endpoints.
+
+1. Install dependencies and start the app:
+   ```
+   pip install -r requirements.txt
+   python app.py
+   ```
+   It serves at `http://127.0.0.1:5000` and creates `cinelog.db` on startup.
+
+2. In a second terminal, seed one user and two films. The titles are chosen so
+   alphabetical ordering is visible ("Amelie" before "Zodiac"), while adding
+   "Zodiac" first:
+   ```
+   python - <<'PY'
+   from app import create_app, db
+   from models import User, Film
+   app = create_app()
+   with app.app_context():
+       u = User(username="tester", email="tester@example.com")
+       f1 = Film(title="Zodiac", year=2007, genre="Thriller")
+       f2 = Film(title="Amelie", year=2001, genre="Romance")
+       db.session.add_all([u, f1, f2]); db.session.commit()
+       print("USER ", u.id); print("FILM1", f1.id); print("FILM2", f2.id)
+   PY
+   ```
+   Note the printed ids.
+
+3. Add both films (substitute the ids from step 2):
+   ```
+   curl -X POST http://127.0.0.1:5000/watchlist/<USER>/add \
+     -H "Content-Type: application/json" -d '{"film_id":"<FILM1>"}'
+   curl -X POST http://127.0.0.1:5000/watchlist/<USER>/add \
+     -H "Content-Type: application/json" -d '{"film_id":"<FILM2>"}'
+   ```
+   Each returns `201` with the created entry, including `"public": true`.
+
+4. View the watchlist and confirm **alphabetical** order — "Amelie" appears before
+   "Zodiac" even though "Zodiac" was added first:
+   ```
+   curl http://127.0.0.1:5000/watchlist/<USER>
+   ```
+
+### Known limitations
+- The add endpoint does not yet translate service errors into clean HTTP status
+  codes. Adding a **nonexistent** film (the service raises `FilmNotFoundError`) and
+  adding a **duplicate** film both currently return `500` instead of a `404`/`409`.
+  The collection endpoint already has this `try/except` mapping; wiring the same
+  into the watchlist route is a planned follow-up.
 
 ## Screenshot
 <img src="git-log--oneline-cmd.png" width="600" alt="git log --oneline showing one commit per bug fix on the bugfix/mixtape branch">
