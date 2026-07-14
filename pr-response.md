@@ -91,3 +91,6 @@ on top of main with a linear history (no merge commits).
 
 ## PR Description
 <!-- Written at the end — feature overview, design decisions, manual testing steps -->
+
+## Screenshot
+<img src="git-log--oneline-cmd.png" width="600" alt="git log --oneline showing one commit per bug fix on the bugfix/mixtape branch">
